@@ -356,8 +356,6 @@
   <div class="lb-name" id="lightboxName"></div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
 
 /* ==========================================================================
@@ -375,23 +373,46 @@ const ADMIN_CODES = ["SG-2026"];  // ← clave para el modo edición (puedes ped
 
 const CATEGORIES = ["Motor", "Frenos", "Transmisión y Cadena", "Suspensión", "Aceites y Lubricantes", "Escape", "Eléctrico", "Accesorios"];
 
-/* conexión a Firestore — si falla (sin internet, bloqueo, etc.) el catálogo
-   sigue funcionando (búsqueda, modo edición, WhatsApp); solo no habrá
-   productos en la nube hasta que se recupere la conexión. */
+/* conexión a Firestore — cargada por nuestro propio código (no con <script src>
+   estático) para no depender del orden de carga de recursos externos, que
+   algunos visores de HTML de terceros no respetan. Si falla (sin internet,
+   bloqueo, etc.) el catálogo sigue funcionando (búsqueda, modo edición,
+   WhatsApp); solo no habrá productos en la nube hasta reconectar. */
 let productsRef = null;
-try{
-  const firebaseConfig = {
-    apiKey: "AizaSyA7tNNML4vi_Jb3mp-Iy_78iKAw7ZX_mo",
-    authDomain: "multimarcas-sg.firebaseapp.com",
-    projectId: "multimarcas-sg",
-    storageBucket: "multimarcas-sg.firebasestorage.app",
-    messagingSenderId: "501913896491",
-    appId: "1:501913896491:web:0a837eaf176106a4a6cc6e",
-    measurementId: "G-7XNJB55DPT"
-  };
-  firebase.initializeApp(firebaseConfig);
-  productsRef = firebase.firestore().collection("productos");
-}catch(e){ console.error("No se pudo conectar a Firebase:", e); }
+function loadScript(src){
+  return new Promise((resolve, reject)=>{
+    const s = document.createElement("script");
+    s.src = src; s.async = false;
+    s.onload = resolve; s.onerror = ()=>reject(new Error("No se pudo cargar "+src));
+    document.head.appendChild(s);
+  });
+}
+async function initFirebase(){
+  try{
+    await loadScript("https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js");
+    await loadScript("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js");
+    const firebaseConfig = {
+      apiKey: "AizaSyA7tNNML4vi_Jb3mp-Iy_78iKAw7ZX_mo",
+      authDomain: "multimarcas-sg.firebaseapp.com",
+      projectId: "multimarcas-sg",
+      storageBucket: "multimarcas-sg.firebasestorage.app",
+      messagingSenderId: "501913896491",
+      appId: "1:501913896491:web:0a837eaf176106a4a6cc6e",
+      measurementId: "G-7XNJB55DPT"
+    };
+    firebase.initializeApp(firebaseConfig);
+    productsRef = firebase.firestore().collection("productos");
+    productsRef.onSnapshot(snapshot=>{
+      PRODUCTS = snapshot.docs.map(d=>d.data());
+      renderChips();
+      sync();
+    }, err=>{
+      console.error(err);
+      document.getElementById("catalog").innerHTML = '<div class="grid"><div class="empty"><div class="big">No se pudo cargar el catálogo</div>Revisa tu conexión e intenta de nuevo.</div></div>';
+    });
+  }catch(e){ console.error("No se pudo conectar a Firebase:", e); }
+}
+initFirebase();
 
 let PRODUCTS = [];
 
@@ -706,18 +727,6 @@ function addProduct(){
       });
     }
   }).catch(e=>alert("Error al agregar: "+e.message));
-}
-
-/* ---- sincronización en vivo con Firestore ---- */
-if(productsRef){
-  productsRef.onSnapshot(snapshot=>{
-    PRODUCTS = snapshot.docs.map(d=>d.data());
-    renderChips();
-    sync();
-  }, err=>{
-    console.error(err);
-    document.getElementById("catalog").innerHTML = '<div class="grid"><div class="empty"><div class="big">No se pudo cargar el catálogo</div>Revisa tu conexión e intenta de nuevo.</div></div>';
-  });
 }
 
 renderChips(); renderCatalog(); sync();
