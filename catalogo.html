@@ -24,7 +24,7 @@
   .mono{font-family:'IBM Plex Mono',monospace;}
 
   /* ===== PANTALLA DE BIENVENIDA (PORTADA) ===== */
-  .splash{position:fixed; inset:0; z-index:100; overflow-y:auto; color:#fff; font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased;
+  .splash{position:fixed; inset:0; z-index:100; overflow:hidden; color:#fff; font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased;
     background:
       radial-gradient(ellipse 900px 620px at 6% -8%, rgba(255,255,255,.30), transparent 62%),
       radial-gradient(ellipse 760px 700px at 102% 108%, rgba(124,255,154,.40), transparent 60%),
@@ -34,26 +34,22 @@
   }
   .splash.hide{display:none;}
   .splash-hbar{width:100%; height:5px; background:linear-gradient(90deg, #fff 0 50%, #178A2C 50% 100%); flex-shrink:0;}
-  .splash main{width:100%; max-width:600px; padding:20px 20px 22px; display:flex; flex-direction:column; align-items:center; gap:12px; text-align:center;}
-  .splash-eyebrow{font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.72); margin:0;}
-  .splash-frame{width:100%; max-width:420px; overflow:hidden; border-radius:18px; box-shadow:0 20px 48px rgba(6,20,20,.28); border:3px solid #fff; background:#fff; animation:splashRise .55s cubic-bezier(.2,.8,.2,1) both;}
-  .splash-frame svg, .splash-frame img{width:100%; height:auto; display:block;}
+  .splash main{width:100%; max-width:600px; height:100%; padding:clamp(10px,3vh,22px) 20px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:clamp(4px,1.4vh,12px); text-align:center; overflow:hidden;}
+  .splash-eyebrow{font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.72); margin:0; flex-shrink:0;}
+  .splash-frame{max-width:min(100%,420px); max-height:38vh; overflow:hidden; border-radius:18px; box-shadow:0 20px 48px rgba(6,20,20,.28); border:3px solid #fff; background:#fff; animation:splashRise .55s cubic-bezier(.2,.8,.2,1) both; flex-shrink:1; display:flex;}
+  .splash-frame svg, .splash-frame img{width:auto; height:100%; max-width:100%; max-height:38vh; object-fit:contain; display:block; margin:0 auto;}
   @keyframes splashRise{ from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:translateY(0);} }
-  .splash h1{font-family:'Archivo',sans-serif; font-weight:900; font-size:38px; line-height:1.03; letter-spacing:-.02em; margin:2px 0 0; color:#fff; text-wrap:balance; animation:splashRise .6s .08s cubic-bezier(.2,.8,.2,1) both;}
-  .splash-sub{font-family:'Archivo',sans-serif; font-weight:700; font-size:14px; line-height:1.35; color:#fff; max-width:32ch; margin:0;}
-  .splash-lead{font-size:12.5px; line-height:1.42; color:rgba(255,255,255,.92); max-width:36ch; margin:0;}
-  .splash-cta{display:inline-flex; align-items:center; gap:9px; background:#fff; color:var(--blue); font-family:'Archivo',sans-serif; font-weight:800; font-size:15px; padding:13px 28px; border-radius:13px; border:none; cursor:pointer; text-decoration:none; margin-top:3px; box-shadow:0 12px 28px rgba(6,20,20,.32); transition:transform .15s ease, box-shadow .15s ease, background .15s ease, color .15s ease;}
+  .splash h1{font-family:'Archivo',sans-serif; font-weight:900; font-size:clamp(24px,5.5vh,38px); line-height:1.03; letter-spacing:-.02em; margin:2px 0 0; color:#fff; text-wrap:balance; animation:splashRise .6s .08s cubic-bezier(.2,.8,.2,1) both; flex-shrink:0;}
+  .splash-sub{font-family:'Archivo',sans-serif; font-weight:700; font-size:clamp(12px,2vh,14px); line-height:1.35; color:#fff; max-width:32ch; margin:0; flex-shrink:0;}
+  .splash-lead{font-size:clamp(11px,1.8vh,12.5px); line-height:1.42; color:rgba(255,255,255,.92); max-width:36ch; margin:0; flex-shrink:0;}
+  .splash-cta{display:inline-flex; align-items:center; gap:9px; background:#fff; color:var(--blue); font-family:'Archivo',sans-serif; font-weight:800; font-size:15px; padding:13px 28px; border-radius:13px; border:none; cursor:pointer; text-decoration:none; margin-top:3px; box-shadow:0 12px 28px rgba(6,20,20,.32); transition:transform .15s ease, box-shadow .15s ease, background .15s ease, color .15s ease; flex-shrink:0;}
   .splash-cta:hover{background:var(--green); color:#fff; transform:translateY(-2px); box-shadow:0 16px 32px rgba(6,20,20,.38);}
   .splash-cta:active{transform:translateY(0);}
   .splash-cta svg{width:18px; height:18px; transition:transform .15s ease;}
   .splash-cta:hover svg{transform:translateX(3px);}
   .splash-foot{font-family:'IBM Plex Mono',monospace; font-size:10px; color:rgba(255,255,255,.72); letter-spacing:.02em; flex-shrink:0; padding-top:6px;}
   @media (min-width:600px) and (min-height:760px){
-    .splash main{padding:40px 24px 48px; gap:16px;}
     .splash-eyebrow{font-size:11px;}
-    .splash h1{font-size:52px;}
-    .splash-sub{font-size:16px;}
-    .splash-lead{font-size:14px;}
     .splash-cta{font-size:16px; padding:15px 32px;}
     .splash-foot{font-size:10.5px;}
   }
