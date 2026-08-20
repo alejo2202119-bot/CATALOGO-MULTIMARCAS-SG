@@ -370,23 +370,28 @@
    nube y se ven en todos los dispositivos, sin descargar ni resubir nada.
    ========================================================================== */
 
-const firebaseConfig = {
-  apiKey: "AizaSyA7tNNML4vi_Jb3mp-Iy_78iKAw7ZX_mo",
-  authDomain: "multimarcas-sg.firebaseapp.com",
-  projectId: "multimarcas-sg",
-  storageBucket: "multimarcas-sg.firebasestorage.app",
-  messagingSenderId: "501913896491",
-  appId: "1:501913896491:web:0a837eaf176106a4a6cc6e",
-  measurementId: "G-7XNJB55DPT"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-const productsRef = db.collection("productos");
-
 const WHATSAPP_NUMBER = "580000000000";   // ← PENDIENTE: reemplazar por el número real de SG (con código de país, sin +)
 const ADMIN_CODES = ["SG-2026"];  // ← clave para el modo edición (puedes pedir que la cambien en cualquier momento)
 
 const CATEGORIES = ["Motor", "Frenos", "Transmisión y Cadena", "Suspensión", "Aceites y Lubricantes", "Escape", "Eléctrico", "Accesorios"];
+
+/* conexión a Firestore — si falla (sin internet, bloqueo, etc.) el catálogo
+   sigue funcionando (búsqueda, modo edición, WhatsApp); solo no habrá
+   productos en la nube hasta que se recupere la conexión. */
+let productsRef = null;
+try{
+  const firebaseConfig = {
+    apiKey: "AizaSyA7tNNML4vi_Jb3mp-Iy_78iKAw7ZX_mo",
+    authDomain: "multimarcas-sg.firebaseapp.com",
+    projectId: "multimarcas-sg",
+    storageBucket: "multimarcas-sg.firebasestorage.app",
+    messagingSenderId: "501913896491",
+    appId: "1:501913896491:web:0a837eaf176106a4a6cc6e",
+    measurementId: "G-7XNJB55DPT"
+  };
+  firebase.initializeApp(firebaseConfig);
+  productsRef = firebase.firestore().collection("productos");
+}catch(e){ console.error("No se pudo conectar a Firebase:", e); }
 
 let PRODUCTS = [];
 
@@ -406,8 +411,14 @@ let activeCat = "Todos";
 let query = "";
 
 /* productos en la nube (Firestore) — se sincronizan solos en todos los dispositivos */
+function sinConexion(){
+  if(productsRef) return false;
+  alert("No hay conexión con la base de datos en la nube. Revisa tu internet y vuelve a intentar.");
+  return true;
+}
 function deleteProduct(sku){
   if(!document.body.classList.contains("admin")) return;
+  if(sinConexion()) return;
   const p = PRODUCTS.find(x=>x.sku===sku); if(!p) return;
   if(!confirm("¿Eliminar \""+p.name+"\" del catálogo? Esta acción no se puede deshacer.")) return;
   delete cart[sku];
@@ -612,6 +623,7 @@ function exitAdmin(){ document.body.classList.remove("admin"); renderCatalog(); 
 
 function toggleStock(sku){
   if(!document.body.classList.contains("admin")) return;
+  if(sinConexion()) return;
   const p = PRODUCTS.find(x=>x.sku===sku); if(!p) return;
   const newStock = p.stock==="in"?"out":"in";
   if(newStock==="out" && cart[sku]) delete cart[sku];
@@ -619,6 +631,7 @@ function toggleStock(sku){
 }
 function editPrice(sku){
   if(!document.body.classList.contains("admin")) return;
+  if(sinConexion()) return;
   const p = PRODUCTS.find(x=>x.sku===sku); if(!p) return;
   const v = prompt("Nuevo precio (USD) para:\n"+p.name, p.price);
   if(v===null) return; const n = parseFloat(v.replace(",","."));
@@ -627,6 +640,7 @@ function editPrice(sku){
 }
 function editName(sku){
   if(!document.body.classList.contains("admin")) return;
+  if(sinConexion()) return;
   const p = PRODUCTS.find(x=>x.sku===sku); if(!p) return;
   const v = prompt("Nuevo nombre:", p.name);
   if(v===null || !v.trim()) return;
@@ -668,11 +682,13 @@ function downloadPhoto(sku){
 }
 function editPhoto(sku){
   if(!document.body.classList.contains("admin")) return;
+  if(sinConexion()) return;
   pickImage((dataUrl)=>{
     productsRef.doc(sku).update({photo:dataUrl}).catch(e=>alert("Error al guardar la foto: "+e.message));
   });
 }
 function addProduct(){
+  if(sinConexion()) return;
   const name = prompt("Nombre del repuesto:"); if(!name||!name.trim()) return;
   let cat = prompt("Categoría ("+CATEGORIES.join(" / ")+"):", CATEGORIES[0]); if(!cat) return;
   cat = cat.trim();
@@ -693,14 +709,16 @@ function addProduct(){
 }
 
 /* ---- sincronización en vivo con Firestore ---- */
-productsRef.onSnapshot(snapshot=>{
-  PRODUCTS = snapshot.docs.map(d=>d.data());
-  renderChips();
-  sync();
-}, err=>{
-  console.error(err);
-  document.getElementById("catalog").innerHTML = '<div class="grid"><div class="empty"><div class="big">No se pudo cargar el catálogo</div>Revisa tu conexión e intenta de nuevo.</div></div>';
-});
+if(productsRef){
+  productsRef.onSnapshot(snapshot=>{
+    PRODUCTS = snapshot.docs.map(d=>d.data());
+    renderChips();
+    sync();
+  }, err=>{
+    console.error(err);
+    document.getElementById("catalog").innerHTML = '<div class="grid"><div class="empty"><div class="big">No se pudo cargar el catálogo</div>Revisa tu conexión e intenta de nuevo.</div></div>';
+  });
+}
 
 renderChips(); renderCatalog(); sync();
 
