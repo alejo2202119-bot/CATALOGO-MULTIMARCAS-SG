@@ -266,7 +266,6 @@
   <span class="txt">MODO EDICIÓN · toca estado, precio, nombre o foto para editar</span>
   <span class="acts">
     <button onclick="addProduct()">＋ Producto</button>
-    <button onclick="downloadCatalog()">Descargar</button>
     <button class="ghost" onclick="exitAdmin()">Salir</button>
   </span>
 </div>
@@ -357,31 +356,39 @@
   <div class="lb-name" id="lightboxName"></div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
 
 /* ==========================================================================
    INVERSIONES Y COMERCIALIZADORA SG C.A. — CATÁLOGO DE PRODUCTOS
    --------------------------------------------------------------------------
-   PARA MODIFICAR EL CATÁLOGO TIENES DOS FORMAS:
-
-   1) FÁCIL (sin tocar código): abre el catálogo, toca el puntito ● del pie,
-      escribe la clave, y entra el MODO EDICIÓN. Ahí puedes cambiar estado
-      (Disponible/Agotado), precio y nombre tocándolos, o agregar productos.
-      Al terminar toca "Descargar" y vuelve a subir ese archivo a tu hosting.
-
-   2) DIRECTO (en el código): edita la lista PRODUCTS de abajo. Cada línea es
-      un producto:  name=nombre · sku=código · cat=categoría · price=precio USD
-      · stock="in" (disponible) o "out" (agotado) · photo=opcional
+   Los productos viven en Firestore (nube). Abre el catálogo, toca el
+   puntito ● del pie, escribe la clave, y entra el MODO EDICIÓN. Ahí puedes
+   cambiar estado (Disponible/Agotado), precio, nombre o foto tocándolos,
+   o agregar/eliminar productos. Los cambios se guardan de una vez en la
+   nube y se ven en todos los dispositivos, sin descargar ni resubir nada.
    ========================================================================== */
+
+const firebaseConfig = {
+  apiKey: "AizaSyA7tNNML4vi_Jb3mp-Iy_78iKAw7ZX_mo",
+  authDomain: "multimarcas-sg.firebaseapp.com",
+  projectId: "multimarcas-sg",
+  storageBucket: "multimarcas-sg.firebasestorage.app",
+  messagingSenderId: "501913896491",
+  appId: "1:501913896491:web:0a837eaf176106a4a6cc6e",
+  measurementId: "G-7XNJB55DPT"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const productsRef = db.collection("productos");
 
 const WHATSAPP_NUMBER = "580000000000";   // ← PENDIENTE: reemplazar por el número real de SG (con código de país, sin +)
 const ADMIN_CODES = ["SG-2026"];  // ← clave para el modo edición (puedes pedir que la cambien en cualquier momento)
 
 const CATEGORIES = ["Motor", "Frenos", "Transmisión y Cadena", "Suspensión", "Aceites y Lubricantes", "Escape", "Eléctrico", "Accesorios"];
 
-/*PRODUCTS_START*/
 let PRODUCTS = [];
-/*PRODUCTS_END*/
 
 const CAT_ICON = {
   "Frenos":'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/>',
@@ -398,36 +405,14 @@ let cart = {};
 let activeCat = "Todos";
 let query = "";
 
-/* estado editable guardado en el dispositivo */
-function loadOverrides(){ try{ return JSON.parse(localStorage.getItem("catalogo_ov")||"{}"); }catch(e){ return {}; } }
-function saveOverrides(){ try{ localStorage.setItem("catalogo_ov", JSON.stringify(overrides)); }catch(e){} }
-let overrides = loadOverrides();
-function loadExtraProducts(){ try{ return JSON.parse(localStorage.getItem("catalogo_extra")||"[]"); }catch(e){ return []; } }
-function saveExtraProducts(){ try{ localStorage.setItem("catalogo_extra", JSON.stringify(extraProducts)); }catch(e){} }
-let extraProducts = loadExtraProducts();
-PRODUCTS = PRODUCTS.concat(extraProducts);
-function loadDeleted(){ try{ return JSON.parse(localStorage.getItem("catalogo_deleted")||"[]"); }catch(e){ return []; } }
-function saveDeleted(){ try{ localStorage.setItem("catalogo_deleted", JSON.stringify(deletedSkus)); }catch(e){} }
-let deletedSkus = loadDeleted();
-PRODUCTS = PRODUCTS.filter(p=>!deletedSkus.includes(p.sku));
+/* productos en la nube (Firestore) — se sincronizan solos en todos los dispositivos */
 function deleteProduct(sku){
   if(!document.body.classList.contains("admin")) return;
   const p = PRODUCTS.find(x=>x.sku===sku); if(!p) return;
   if(!confirm("¿Eliminar \""+p.name+"\" del catálogo? Esta acción no se puede deshacer.")) return;
-  PRODUCTS = PRODUCTS.filter(x=>x.sku!==sku);
-  extraProducts = extraProducts.filter(x=>x.sku!==sku); saveExtraProducts();
-  if(!deletedSkus.includes(sku)){ deletedSkus.push(sku); saveDeleted(); }
-  delete overrides[sku]; saveOverrides();
   delete cart[sku];
-  sync();
+  productsRef.doc(sku).delete().catch(e=>alert("Error al eliminar: "+e.message));
 }
-function applyOverrides(){
-  PRODUCTS.forEach(p=>{
-    const o = overrides[p.sku];
-    if(o){ if(o.stock) p.stock=o.stock; if(o.price!=null) p.price=o.price; if(o.name) p.name=o.name; if(o.photo) p.photo=o.photo; }
-  });
-}
-applyOverrides();
 
 function allCats(){
   const extra = [...new Set(PRODUCTS.map(p=>p.cat))]
@@ -627,25 +612,25 @@ function exitAdmin(){ document.body.classList.remove("admin"); renderCatalog(); 
 
 function toggleStock(sku){
   if(!document.body.classList.contains("admin")) return;
-  const p = PRODUCTS.find(x=>x.sku===sku); p.stock = p.stock==="in"?"out":"in";
-  overrides[sku] = Object.assign({}, overrides[sku], {stock:p.stock}); saveOverrides();
-  if(p.stock==="out" && cart[sku]) delete cart[sku];
-  sync();
+  const p = PRODUCTS.find(x=>x.sku===sku); if(!p) return;
+  const newStock = p.stock==="in"?"out":"in";
+  if(newStock==="out" && cart[sku]) delete cart[sku];
+  productsRef.doc(sku).update({stock:newStock}).catch(e=>alert("Error al guardar: "+e.message));
 }
 function editPrice(sku){
   if(!document.body.classList.contains("admin")) return;
-  const p = PRODUCTS.find(x=>x.sku===sku);
+  const p = PRODUCTS.find(x=>x.sku===sku); if(!p) return;
   const v = prompt("Nuevo precio (USD) para:\n"+p.name, p.price);
   if(v===null) return; const n = parseFloat(v.replace(",","."));
   if(isNaN(n)||n<0){ alert("Precio no válido."); return; }
-  p.price = n; overrides[sku] = Object.assign({}, overrides[sku], {price:n}); saveOverrides(); sync();
+  productsRef.doc(sku).update({price:n}).catch(e=>alert("Error al guardar: "+e.message));
 }
 function editName(sku){
   if(!document.body.classList.contains("admin")) return;
-  const p = PRODUCTS.find(x=>x.sku===sku);
+  const p = PRODUCTS.find(x=>x.sku===sku); if(!p) return;
   const v = prompt("Nuevo nombre:", p.name);
   if(v===null || !v.trim()) return;
-  p.name = v.trim(); overrides[sku] = Object.assign({}, overrides[sku], {name:p.name}); saveOverrides(); sync();
+  productsRef.doc(sku).update({name:v.trim()}).catch(e=>alert("Error al guardar: "+e.message));
 }
 function pickImage(callback){
   const input = document.createElement("input");
@@ -683,13 +668,8 @@ function downloadPhoto(sku){
 }
 function editPhoto(sku){
   if(!document.body.classList.contains("admin")) return;
-  const p = PRODUCTS.find(x=>x.sku===sku);
   pickImage((dataUrl)=>{
-    p.photo = dataUrl;
-    overrides[sku] = Object.assign({}, overrides[sku], {photo:dataUrl}); saveOverrides();
-    const extra = extraProducts.find(x=>x.sku===sku);
-    if(extra) extra.photo = dataUrl, saveExtraProducts();
-    sync();
+    productsRef.doc(sku).update({photo:dataUrl}).catch(e=>alert("Error al guardar la foto: "+e.message));
   });
 }
 function addProduct(){
@@ -701,34 +681,26 @@ function addProduct(){
   if(catMatch) cat = catMatch;
   const price = parseFloat((prompt("Precio USD:","0")||"0").replace(",",".")); if(isNaN(price)){ alert("Precio no válido."); return; }
   const sku = (prompt("Código (SKU):","NUEVO-"+(PRODUCTS.length+1))||"").trim(); if(!sku) return;
+  if(PRODUCTS.some(p=>p.sku===sku)){ alert("Ya existe un producto con ese código (SKU)."); return; }
   const nuevo = {name:name.trim(), sku, cat:cat.trim(), price, stock:"in"};
-  PRODUCTS.push(nuevo); extraProducts.push(nuevo); saveExtraProducts();
-  sync();
-  if(confirm("Producto agregado. ¿Deseas agregarle una foto ahora?")){
-    pickImage((dataUrl)=>{
-      nuevo.photo = dataUrl; saveExtraProducts(); sync();
-      alert("Foto agregada. Recuerda tocar \"Descargar\" para guardarlo de forma permanente en el catálogo de todos.");
-    });
-  } else {
-    alert("Recuerda tocar \"Descargar\" para guardarlo de forma permanente en el catálogo de todos.");
-  }
+  productsRef.doc(sku).set(nuevo).then(()=>{
+    if(confirm("Producto agregado. ¿Deseas agregarle una foto ahora?")){
+      pickImage((dataUrl)=>{
+        productsRef.doc(sku).update({photo:dataUrl}).catch(e=>alert("Error al guardar la foto: "+e.message));
+      });
+    }
+  }).catch(e=>alert("Error al agregar: "+e.message));
 }
 
-/* ---- descargar catálogo actualizado (para re-subir) ---- */
-function downloadCatalog(){
-  const serial = "let PRODUCTS = " + JSON.stringify(PRODUCTS, null, 2)
-    .replace(/</g,'\\u003c') + ";";
-  let src = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
-  src = src.replace(/\/\*PRODUCTS_START\*\/[\s\S]*?\/\*PRODUCTS_END\*\//,
-                    "/*PRODUCTS_START*/\n" + serial + "\n/*PRODUCTS_END*/");
-  src = src.replace(/ class="admin"/,''); // salir del modo edición en el archivo guardado
-  const blob = new Blob([src], {type:"text/html"});
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "catalogo.html";
-  document.body.appendChild(a); a.click(); a.remove();
-  alert("Catálogo descargado. Envía ese archivo para publicarlo y que todos vean los cambios en el link.");
-}
+/* ---- sincronización en vivo con Firestore ---- */
+productsRef.onSnapshot(snapshot=>{
+  PRODUCTS = snapshot.docs.map(d=>d.data());
+  renderChips();
+  sync();
+}, err=>{
+  console.error(err);
+  document.getElementById("catalog").innerHTML = '<div class="grid"><div class="empty"><div class="big">No se pudo cargar el catálogo</div>Revisa tu conexión e intenta de nuevo.</div></div>';
+});
 
 renderChips(); renderCatalog(); sync();
 
