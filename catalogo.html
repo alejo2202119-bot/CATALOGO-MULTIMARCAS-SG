@@ -269,6 +269,7 @@
   <span class="txt">MODO EDICIÓN · toca estado, precio, nombre o foto para editar</span>
   <span class="acts">
     <button onclick="addProduct()">＋ Producto</button>
+    <button onclick="downloadBackup()">Respaldo</button>
     <button class="ghost" onclick="exitAdmin()">Salir</button>
   </span>
 </div>
@@ -741,6 +742,36 @@ function addProduct(){
       });
     }
   }).catch(e=>alert("Error al agregar: "+e.message));
+}
+
+/* ---- respaldo completo del catálogo (nombres, códigos, precios, categorías, fotos) ---- */
+function downloadBackup(){
+  if(!document.body.classList.contains("admin")) return;
+  if(PRODUCTS.length===0){
+    if(!confirm("No hay productos cargados en este momento. ¿Descargar de todas formas un respaldo vacío?")) return;
+  }
+  const backup = {
+    empresa: "Inversiones y Comercializadora SG C.A.",
+    rif: "J-40385875-6",
+    generado: new Date().toISOString(),
+    total_productos: PRODUCTS.length,
+    productos: PRODUCTS
+  };
+  let json;
+  try{
+    json = JSON.stringify(backup, null, 2);
+  }catch(e){
+    alert("No se pudo generar el respaldo: "+e.message);
+    return;
+  }
+  const blob = new Blob([json], {type:"application/json"});
+  const a = document.createElement("a");
+  const fecha = new Date().toISOString().slice(0,10);
+  a.href = URL.createObjectURL(blob);
+  a.download = `respaldo-catalogo-sg-${fecha}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(a.href);
+  alert(`Respaldo descargado: ${PRODUCTS.length} producto(s) con nombre, código, precio, categoría, estado y foto.`);
 }
 
 renderChips(); renderCatalog(); sync();
